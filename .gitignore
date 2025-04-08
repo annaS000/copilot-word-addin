@@ -19,7 +19,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
+key.py
 # Virtual Environment
 venv/
 ENV/
@@ -39,3 +39,15 @@ env/
 # OS
 .DS_Store
 Thumbs.db 
+
+# SSL
+certs/
+
+# API
+api/key.py 
+api/.env
+api/certs/
+
+# Add-in
+copilot-dupe/node_modules/
+copilot-dupe/dist/

@@ -1,0 +1,6 @@
+flask[async]==3.0.2
+python-dotenv==1.0.1
+openai==1.12.0
+anthropic==0.18.1
+flask-cors==4.0.0
+httpx==0.24.1 

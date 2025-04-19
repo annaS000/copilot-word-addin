@@ -97,10 +97,19 @@ Format the response as:
 
 @llm_bp.route('/improve', methods=['POST'])
 async def improve():
-    data = request.json
+    print("Received improve request") # Debug log
+    try:
+        data = request.json
+        print(f"Request data: {data}") # Debug log
+    except Exception as e:
+        print(f"Failed to parse request JSON: {str(e)}") # Debug log
+        return jsonify({"error": "Invalid request format"}), 400
+    
     provider = data.get('provider', 'openai')
     model_name = data.get('model_name')
     text = data.get('text')
+    
+    print(f"Request data: provider={provider}, model={model_name}, text length={len(text) if text else 0}") # Debug log
     
     if not text:
         return jsonify({"error": "Text is required"}), 400
@@ -117,7 +126,7 @@ Maintain the core message while enhancing its effectiveness.
 Text to improve:
 {text}
 
-Provide the response in the following JSON format:
+Return ONLY a valid JSON object with this EXACT structure:
 {{
   "improved_text": "The enhanced version with all improvements applied",
   "changes": [
@@ -127,7 +136,7 @@ Provide the response in the following JSON format:
   ],
   "suggestions": [
     "Additional recommendations for further improvement",
-    "Style tips specific to this type of content",
+    "Style tips specific to this content",
     "Optional enhancements that could be considered"
   ]
 }}
@@ -137,22 +146,75 @@ Guidelines:
 2. Enhance clarity and readability
 3. Improve structure and flow
 4. Strengthen word choice and impact
-5. Maintain appropriate tone and style"""
+5. Maintain appropriate tone and style
+6. Return ONLY valid JSON - no markdown formatting or other text"""
 
+        print("Sending request to model") # Debug log
         response = await model.generate_completion(
             prompt=prompt,
-            max_tokens=800,
+            max_tokens=1000,
             temperature=0.4  # Balanced between creativity and consistency
         )
+        print(f"Received raw response from model: {response}") # Debug log
 
         # Parse the response to ensure it's valid JSON
         try:
-            improve_data = response.get('text', '{}')
+            response_text = response.get('text', '{}')
+            print(f"Response text before cleanup: {response_text}") # Debug log
+            
+            # Remove any markdown formatting if present
+            if response_text.startswith('```'):
+                print("Removing markdown code block formatting") # Debug log
+                response_text = response_text.split('\n', 1)[1]  # Remove first line
+                response_text = response_text.rsplit('\n', 1)[0]  # Remove last line
+                response_text = response_text.replace('```json\n', '').replace('```', '')
+            
+            # Clean up any potential leading/trailing whitespace and normalize newlines
+            response_text = response_text.strip().replace('\r\n', '\n').replace('\r', '\n')
+            print(f"Response text after cleanup: {response_text}") # Debug log
+            
+            try:
+                improve_data = json.loads(response_text)
+                print(f"Successfully parsed JSON: {improve_data}") # Debug log
+            except json.JSONDecodeError as e:
+                # Try to clean up common JSON formatting issues
+                response_text = response_text.replace('\n', ' ').replace('  ', ' ')
+                print(f"Retrying JSON parse with cleaned text: {response_text}") # Debug log
+                improve_data = json.loads(response_text)
+            
+            # Validate required fields
+            required_fields = ['improved_text', 'changes', 'suggestions']
+            missing_fields = [field for field in required_fields if field not in improve_data]
+            
+            if missing_fields:
+                print(f"Missing required fields: {missing_fields}") # Debug log
+                raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
+            
+            # Validate field types
+            if not isinstance(improve_data['improved_text'], str):
+                raise ValueError("improved_text must be a string")
+            if not isinstance(improve_data['changes'], list):
+                raise ValueError("changes must be a list")
+            if not isinstance(improve_data['suggestions'], list):
+                raise ValueError("suggestions must be a list")
+            
+            # Clean up any extra whitespace in the improved text
+            improve_data['improved_text'] = improve_data['improved_text'].strip()
+            
+            print("Returning successful response") # Debug log
             return jsonify(improve_data)
-        except Exception as e:
-            return jsonify({"error": "Failed to parse improvement results"}), 500
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {str(e)}") # Debug log
+            print(f"Error occurred at position {e.pos}") # Debug log
+            print(f"Error line: {e.lineno}, column: {e.colno}") # Debug log
+            print(f"Document: {e.doc}") # Debug log
+            return jsonify({"error": f"Failed to parse improvement results: {str(e)}"}), 500
+        except ValueError as e:
+            print(f"Validation error: {str(e)}") # Debug log
+            return jsonify({"error": str(e)}), 500
             
     except Exception as e:
+        print(f"Unexpected error: {str(e)}") # Debug log
         return jsonify({"error": str(e)}), 500
 
 @llm_bp.route('/summarize', methods=['POST'])
@@ -201,10 +263,27 @@ Guidelines:
 
         # Parse the response to ensure it's valid JSON
         try:
-            summary_data = response.get('text', '{}')
+            response_text = response.get('text', '{}')
+            # Remove any markdown formatting if present
+            if response_text.startswith('```'):
+                response_text = response_text.split('\n', 1)[1]  # Remove first line
+                response_text = response_text.rsplit('\n', 1)[0]  # Remove last line
+                response_text = response_text.replace('```json\n', '').replace('```', '')
+            
+            summary_data = json.loads(response_text)
+            
+            # Validate required fields
+            required_fields = ['summary', 'key_points', 'length_reduction']
+            missing_fields = [field for field in required_fields if field not in summary_data]
+            
+            if missing_fields:
+                raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
+            
             return jsonify(summary_data)
-        except Exception as e:
-            return jsonify({"error": "Failed to parse summarization results"}), 500
+        except json.JSONDecodeError as e:
+            return jsonify({"error": f"Failed to parse summarization results: {str(e)}"}), 500
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 500
             
     except Exception as e:
         return jsonify({"error": str(e)}), 500

@@ -296,11 +296,7 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     const welcomeMessage: Message = {
-      text: `Hi! I'm GPT-4o, your AI writing assistant. I can help you with:\n\n` +
-            `📝 Writing and editing\n` +
-            `📚 Research and analysis\n` +
-            `✨ Text formatting\n` +
-            `📋 Summarization\n\n` +
+      text: `Hi! I'm your AI writing assistant.\n\n` +
             `You can type a message or use the quick action buttons above. How can I help you today?`,
       sender: 'ai',
       timestamp: new Date()
@@ -689,15 +685,7 @@ export default function App(): JSX.Element {
           body: JSON.stringify({
             text: text,
             model_name: selectedModel,
-            provider: 'openai',
-            ...(commandId === 'research' && {
-              search_depth: 'comprehensive',
-              include_sources: true
-            }),
-            ...(commandId === 'improve' && {
-              focus_areas: ['clarity', 'conciseness', 'grammar', 'style'],
-              include_suggestions: true
-            })
+            provider: 'openai'
           }),
           credentials: 'include'
         });
